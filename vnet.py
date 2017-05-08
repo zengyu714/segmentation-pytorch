@@ -10,9 +10,9 @@ class conv3d(nn.Module):
         + Assign them as member variables
         """
         super(conv3d, self).__init__()
-        self.conv = nn.Conv3d(in_channels, out_channels, kernel_size)
+        self.conv = nn.Conv3d(in_channels, out_channels, kernel_size, padding=1)
         self.norm = nn.InstanceNorm3d(out_channels, affine=True)  # with learnable parameters
-        self.relu = activation_func(self.conv)
+        self.relu = activation_func()
 
     def forward(self, x):
         return self.relu(self.norm(self.conv(x)))
@@ -24,11 +24,11 @@ class conv3d_x3(nn.Module):
         inputs --> ① --> ② --> ③ --> outputs
                    ↓ --> add--> ↑
     """
-    def __init__(self, in_channels, out_channels, kernel_size=3, activation_func=nn.ReLU):
+    def __init__(self, in_channels, out_channels, kernel_size=3):
         super(conv3d_x3, self).__init__()
-        self.conv_1 = conv3d(in_channels,  out_channels, kernel_size, activation_func)
-        self.conv_2 = conv3d(out_channels, out_channels, kernel_size, activation_func)
-        self.conv_3 = conv3d(out_channels, out_channels, kernel_size, activation_func)
+        self.conv_1 = conv3d(in_channels,  out_channels, kernel_size)
+        self.conv_2 = conv3d(out_channels, out_channels, kernel_size)
+        self.conv_3 = conv3d(out_channels, out_channels, kernel_size)
 
     def forward(self, x):
         z_1 = self.conv_1(x)
@@ -47,18 +47,18 @@ class deconv3d_x3(nn.Module):
         rhs_up = self.up(rhs)
         lhs_conv = self.lhs_conv(lhs)
         rhs_add = crop(rhs_up, lhs_conv) + lhs_conv
-        return self.con_x3(rhs_add)
+        return self.conv_x3(rhs_add)
 
 def crop(large, small):
     """large / small with shape [batch_size, channels, depth, height, width]"""
 
     l, s = large.size(), small.size()
-    offset = [(l[2] - s[2]) // 2, (l[3] - s[3]) // 2, (l[4] - s[4]) // 2]
+    offset = [0, 0, (l[2] - s[2]) // 2, (l[3] - s[3]) // 2, (l[4] - s[4]) // 2]
     return large[..., offset[2]: offset[2] + s[2], offset[3]: offset[3] + s[3], offset[4]: offset[4] + s[4]]
 
 def conv3d_as_pool(in_channels, out_channels, kernel_size=3, stride=2, activation_func=nn.ReLU):
     layers = [
-        nn.Conv3d(in_channels, out_channels, kernel_size, stride),
+        nn.Conv3d(in_channels, out_channels, kernel_size, stride, padding=1),
         nn.InstanceNorm3d(out_channels, affine=True),
         activation_func()
     ]
@@ -73,25 +73,24 @@ def deconv3d_as_up(in_channels, out_channels, kernel_size=3, stride=2, activatio
     return nn.Sequential(*layers)
 
 class softmax_out(nn.Module):
-    
+
     def __init__(self, in_channels,  out_channels):
         super(softmax_out, self).__init__()
-        self.conv_1 = nn.Conv3d(in_channels,  out_channels, kernel_size=3)
-        self.conv_2 = nn.Conv3d(out_channels, out_channels, kernel_size=1)
+        self.conv_1 = nn.Conv3d(in_channels,  out_channels, kernel_size=3, padding=1)
+        self.conv_2 = nn.Conv3d(out_channels, out_channels, kernel_size=1, padding=0)
         self.bn = nn.BatchNorm3d(out_channels)
-        self.softmax = nn.Softmax
-        self.relu = nn.ReLU
+        self.softmax = nn.Softmax()
+        self.relu = nn.ReLU()
 
     def forward(self, x):
-        x_shape = x.size()
-        x_shape_perm = x_shape.permute(0, 2, 3, 4, 1)
+        """Output with shape [batch_size, 1, depth, height, width]."""
         y_conv = self.conv_2(self.relu(self.bn(self.conv_1(x))))
-
+        # Put channel axis in the last dim for softmax.
         y_perm = y_conv.permute(0, 2, 3, 4, 1).contiguous()
         y_flat = y_perm.view(-1, 2)
         y_softmax = self.softmax(y_flat)
-        y_reshape = y_softmax.view(*x_shape_perm)
-        return y_reshape[:, None, ..., 1]
+        y_reshape = y_softmax.view(*y_perm.size())
+        return y_reshape.permute(0, 2, 3, 4, 1)
 
 class VNet(nn.Module):
 
