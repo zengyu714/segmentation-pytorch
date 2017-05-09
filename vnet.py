@@ -10,8 +10,9 @@ class conv3d(nn.Module):
         """
         super(conv3d, self).__init__()
         self.conv = nn.Conv3d(in_channels, out_channels, kernel_size, padding=1)
-        self.norm = nn.InstanceNorm3d(out_channels, affine=True)  # with learnable parameters
         self.relu = activation_func()
+        # with learnable parameters
+        self.norm = nn.InstanceNorm3d(out_channels, affine=True)
 
     def forward(self, x):
         return self.relu(self.norm(self.conv(x)))
@@ -89,7 +90,7 @@ class softmax_out(nn.Module):
         y_flat = y_perm.view(-1, 2)
         y_softmax = self.softmax(y_flat)
         y_reshape = y_softmax.view(*y_perm.size())
-        return y_reshape.permute(0, 2, 3, 4, 1)
+        return y_reshape.permute(0, 4, 1, 2, 3)
 
 class VNet(nn.Module):
 

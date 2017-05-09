@@ -58,7 +58,7 @@ def _rotate_and_rescale(xs, ys):
     """
 
     degree = np.int(np.random.uniform(low=-3, high=5))
-    factor = np.random.uniform(low=0.9, high=1.1)
+    factor = np.random.uniform(low=0.85, high=0.95)
     # swap axis
     HWC_xs, HWC_ys = [np.transpose(item, [1, 2, 0]) for item in [xs, ys]]
     # rotate and rescale

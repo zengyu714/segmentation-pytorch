@@ -14,6 +14,7 @@ class config:
         self.training_size = 12
         self.val_size = 3
         self.learning_rate = 3e-6
+        self.seed = 714
         self.threads = 24
         self.from_scratch = False
         self.checkpoint_dir = './checkpoints/'

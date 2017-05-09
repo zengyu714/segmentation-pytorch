@@ -14,7 +14,7 @@ from inputs import DatasetFromFolder
 conf = config()
 conf.prefix = 'vnet'
 conf.checkpoint_dir += conf.prefix
-conf.learning_rate = 1e-5
+conf.learning_rate = 3e-6
 conf.from_scratch = False
 conf.resume_step = -1
 
@@ -22,10 +22,9 @@ conf.resume_step = -1
 torch.cuda.set_device(3)
 print('===> Current GPU device is', torch.cuda.current_device())
 
-# seed = int(time.time())
-# torch.manual_seed(seed)
-# if conf.cuda:
-#     torch.cuda.manual_seed(seed)
+torch.manual_seed(conf.seed)
+if conf.cuda:
+    torch.cuda.manual_seed(conf.seed)
 
 def training_data_loader():
     return DataLoader(dataset=DatasetFromFolder(), num_workers=conf.threads, batch_size=conf.batch_size, shuffle=True)
@@ -87,6 +86,11 @@ def train(train_loader, model, criterion, optimizer, i, total_i):
     epoch_loss = 0
     epoch_overlap = 0
     epoch_acc = 0
+
+    # Sets the module in training mode.
+    # This has any effect only on modules such as Dropout or BatchNorm.
+    model.train()
+
     for partial_epoch, (image, label) in enumerate(train_loader, 1):
         image, label = Variable(image).float(), Variable(label).float()
         if conf.cuda:
@@ -123,6 +127,11 @@ def validate(val_loader, model, criterion):
     epoch_loss = 0
     epoch_overlap = 0
     epoch_acc = 0
+
+    # Sets the module in evaluation mode
+    # This has any effect only on modules such as Dropout or BatchNorm.
+    model.eval()
+
     for image, label in val_loader:
         image, label = Variable(image, volatile=True).float(), Variable(label, volatile=True).float()
         if conf.cuda:
