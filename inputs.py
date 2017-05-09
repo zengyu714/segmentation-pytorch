@@ -1,5 +1,5 @@
-import os
-import time
+import os, time
+
 import torch
 import numpy as np
 import nibabel as nib
@@ -95,7 +95,7 @@ class DatasetFromFolder(data.Dataset):
 
     def __getitem__(self, index):
         # Set random seed for ramdom augment.
-        torch.manual_seed(int(time.time()))
+        np.random.seed(int(time.time()))
 
         # Load nii file.
         xs, ys = [nib.load(p[index]).get_data() for p in [self.image_path, self.label_path]]

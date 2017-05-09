@@ -19,7 +19,7 @@ conf.from_scratch = False
 conf.resume_step = -1
 
 # GPU configuration
-torch.cuda.set_device(1)
+torch.cuda.set_device(3)
 print('===> Current GPU device is', torch.cuda.current_device())
 
 # seed = int(time.time())
@@ -44,7 +44,7 @@ def get_resume_path():
         return require
     raise Exception('\'%s\' dose not exist!' % require)
 
-def save_checkpoints(step):
+def save_checkpoints(model, step):
     # Save 20 checkpoints at most.
     names = os.listdir(conf.checkpoint_dir)
     if len(names) >= 20:
@@ -81,7 +81,7 @@ def main():
         train(training_data_loader(), model, criterion, optimizer, i, total_i)
         validate(validation_data_loader(), model, criterion)
         if i % 20 == 0:
-            save_checkpoints(i)
+            save_checkpoints(model, i)
 
 def train(train_loader, model, criterion, optimizer, i, total_i):
     epoch_loss = 0
