@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 class conv3d(nn.Module):
 
@@ -116,14 +115,14 @@ class VNet(nn.Module):
 
     def forward(self, x):
         conv_1 = self.conv_1(x)
-        pool_1 = self.pool_1(conv_1)
-        conv_2 = self.conv_2(pool_1)
-        pool_2 = self.pool_2(conv_2)
-        conv_3 = self.conv_3(pool_2)
-        pool_3 = self.pool_3(conv_3)
-        conv_4 = self.conv_4(pool_3)
-        pool_4 = self.pool_4(conv_4)
-        bottom = self.bottom(pool_4)
+        pool = self.pool_1(conv_1)
+        conv_2 = self.conv_2(pool)
+        pool = self.pool_2(conv_2)
+        conv_3 = self.conv_3(pool)
+        pool = self.pool_3(conv_3)
+        conv_4 = self.conv_4(pool)
+        pool = self.pool_4(conv_4)
+        bottom = self.bottom(pool)
         deconv = self.deconv_4(conv_4, bottom)
         deconv = self.deconv_3(conv_3, deconv)
         deconv = self.deconv_2(conv_2, deconv)

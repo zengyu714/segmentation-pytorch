@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 import numpy as np
 import nibabel as nib
@@ -81,39 +82,41 @@ def _translate(xs, ys):
 class DatasetFromFolder(data.Dataset):
 
     def __init__(self, data_path='./data/train'):
-        """Assume dataset is in directory '.data/train' or './data/val'"""
-
+        """Assume dataset is in directory '.data/train' or './data/val'
+            1. Read one data from file (e.g. using numpy.fromfile, PIL.Image.open).
+            2. Preprocess the data (e.g. torchvision.Transform).
+            3. Return a data pair (e.g. image and label).
+        """
         super(DatasetFromFolder, self).__init__()
         self.data_path  = data_path
         self.label_path = [os.path.join(self.data_path, p)
                            for p in os.listdir(self.data_path) if p.endswith('Label.nii')]
         self.image_path = [p.replace('_Label', '') for p in self.label_path]
-        self.mode = os.path.basename(data_path)
 
     def __getitem__(self, index):
+        # Set random seed for ramdom augment.
+        torch.manual_seed(int(time.time()))
+
+        # Load nii file.
         xs, ys = [nib.load(p[index]).get_data() for p in [self.image_path, self.label_path]]
 
         # Crop black region to reduce nii volumes.
         xs, ys, *_ = _banish_darkness(xs, ys)
+
         # Normalize, `xs` with dtype float64
         xs = (xs - np.min(xs)) / (np.max(xs) - np.min(xs))
-        # Image augmentation.
+
+        # Image augment.
         xs, ys = _rotate_and_rescale(xs, ys)
         xs, ys = _translate(xs, ys)
         xs = _augment(xs)
 
         # Regenerate the binary label, just in case.
         ys = (ys > 0).astype(np.uint8)
+
         # Add gray image channel, with shape [1, depth, height, width]
         xs, ys = [item[np.newaxis, ...] for item in [xs, ys]]
-
         return torch.from_numpy(xs), torch.from_numpy(ys)
 
     def __len__(self):
         return len(self.image_path)
-
-def load_training_set():
-    return DatasetFromFolder()
-
-def load_validation_set():
-    return DatasetFromFolder(data_path='./data/val')
