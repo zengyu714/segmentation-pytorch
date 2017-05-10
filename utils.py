@@ -33,7 +33,7 @@ def dice_loss(y_true, y_conv):
         y_true: [batch_size * 1 * depth * height * width]
         y_conv: [batch_size * depth * height * width, 2]
     """
-    y_conv = y_conv[:, 1]
+    y_conv = y_conv[1, :]
 
     intersection = torch.sum(y_conv * y_true, 0)
     # `dim = 0` for Tensor result

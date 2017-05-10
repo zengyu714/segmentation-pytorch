@@ -14,7 +14,7 @@ from inputs import DatasetFromFolder
 conf = config()
 conf.prefix = 'vnet'
 conf.checkpoint_dir += conf.prefix
-conf.learning_rate = 3e-6
+conf.learning_rate = 2e-9
 conf.from_scratch = False
 conf.resume_step = -1
 
@@ -71,7 +71,7 @@ def main():
         start_i = int(cp_name.split('_')[-1].split('.')[0]) + 1
     print('===> Begin training at epoch {}'.format(start_i))
 
-     # Define loss function (criterion) and optimizer.
+    # Define loss function (criterion) and optimizer.
     criterion = dice_loss
     optimizer = optim.Adam(model.parameters(), lr=conf.learning_rate)
     total_i = conf.epochs * conf.augment_size
@@ -100,7 +100,7 @@ def train(train_loader, model, criterion, optimizer, i, total_i):
         optimizer.zero_grad()
         output_onehot = model(image)
 
-        output = output_onehot.contiguous().view(-1, 2)
+        output = output_onehot.contiguous().view(2, -1)
         target = label.view(-1)
 
         loss = criterion(target, output)
@@ -109,7 +109,7 @@ def train(train_loader, model, criterion, optimizer, i, total_i):
         optimizer.step()
 
         # Compute dice overlap by `argmax`
-        pred = output.data.max(1)[1].float()
+        pred = output.data.max(0)[1].float()
         true = target.data.float()
         dice_overlap = 2 * torch.sum(pred * true) / (torch.sum(pred) + torch.sum(true)) * 100
         epoch_overlap += dice_overlap
@@ -119,8 +119,8 @@ def train(train_loader, model, criterion, optimizer, i, total_i):
         epoch_acc += accuracy
 
     avg_loss, avg_dice, avg_acc = (epoch_loss / conf.training_size), (epoch_overlap / conf.training_size), (epoch_acc / conf.training_size)
-    print_format = [i, i // total_i + 1, total_i, avg_loss, avg_dice, avg_acc]
-    print('===> Training epoch {} ({}/{})\t\tLoss: {:.5f}\tDice Overlap {:.5f}\tAccuracy: {:.5f}'.format(*print_format))
+    print_format = [i, i // conf.augment_size + 1, conf.epochs, avg_loss, avg_dice, avg_acc]
+    print('===> Training step {} ({}/{})\tLoss: {:.5f}\tDice Overlap {:.5f}\tAccuracy: {:.5f}'.format(*print_format))
     return avg_loss, avg_dice, avg_acc
 
 def validate(val_loader, model, criterion):
@@ -139,14 +139,14 @@ def validate(val_loader, model, criterion):
             label = label.cuda()
 
         output_onehot = model(image)
-        output = output_onehot.contiguous().view(-1, 2)
+        output = output_onehot.contiguous().view(2, -1)
         target = label.view(-1)
 
         loss = criterion(target, output)
         epoch_loss += loss.data[0]
 
         # Compute dice overlap
-        pred = output.data.max(1)[1].float()
+        pred = output.data.max(0)[1].float()
         true = target.data.float()
         dice_overlap = 2 * torch.sum(pred * true) / (torch.sum(pred) + torch.sum(true)) * 100
         epoch_overlap += dice_overlap
@@ -157,8 +157,8 @@ def validate(val_loader, model, criterion):
 
     avg_loss, avg_dice, avg_acc = (epoch_loss / conf.val_size), (epoch_overlap / conf.val_size), (epoch_acc / conf.val_size)
     print(
-        '===> ===> Validation Performance', '-' * 14,
-        'Loss: %7.5f' % avg_loss, '-' * 1,
+        '===> ===> Validation Performance', '-' * 60,
+        'Loss: %7.5f' % avg_loss, '-' * 2,
         'Dice Overlap %7.5f' % avg_dice, '-' * 2,
         'Accuracy: %7.5f' % avg_acc
     )
