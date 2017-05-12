@@ -136,7 +136,7 @@ def main():
             accuracy = pred.eq(true).cpu().sum() / true.numel() * 100
             epoch_acc += accuracy
 
-        avg_loss, avg_dice, avg_acc = (epoch_loss / conf.training_size), (epoch_overlap / conf.training_size), (epoch_acc / conf.training_size)
+        avg_loss, avg_dice, avg_acc =np.array([epoch_loss, epoch_overlap, epoch_acc]) / conf.training_size
         print_format = [i, i // conf.augment_size + 1, conf.epochs, avg_loss, avg_dice, avg_acc]
         print('===> Training step {} ({}/{})\tLoss: {:.5f}\tDice Overlap {:.5f}\tAccuracy: {:.5f}'.format(*print_format))
         return avg_loss, avg_dice, avg_acc
@@ -199,7 +199,8 @@ def main():
 
         if i % 20 == 0:
             save_checkpoints(model, i)
-            np.save(os.path.join(result_dir, 'results_dict.npy'), results_dict)
+            # np.load('path/to/').item()
+            np.save(os.path.join(conf.result_dir, 'results_dict.npy'), results_dict)
 
 if __name__ == '__main__':
     main()
