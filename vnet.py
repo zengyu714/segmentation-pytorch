@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class conv3d(nn.Module):
 
@@ -74,27 +75,28 @@ def deconv3d_as_up(in_channels, out_channels, kernel_size=3, stride=2, activatio
 
 class softmax_out(nn.Module):
 
-    def __init__(self, in_channels,  out_channels):
+    def __init__(self, in_channels,  out_channels, criterion):
         super(softmax_out, self).__init__()
         self.conv_1 = nn.Conv3d(in_channels,  out_channels, kernel_size=3, padding=1)
         self.conv_2 = nn.Conv3d(out_channels, out_channels, kernel_size=1, padding=0)
-        self.bn = nn.BatchNorm3d(out_channels)
-        self.softmax = nn.Softmax()
-        self.relu = nn.ReLU()
+        if criterion == 'nll':
+            self.softmax = F.log_softmax
+        else:
+            assert criterion == 'dice', "Expect `dice` (dice loss) or `nll` (negative log likelihood loss)."
+            self.softmax = F.softmax
 
     def forward(self, x):
         """Output with shape [batch_size, 1, depth, height, width]."""
-        y_conv = self.conv_2(self.relu(self.bn(self.conv_1(x))))
+        # Do NOT add normalize layer, or its values vanish.
+        y_conv = self.conv_2(self.conv_1(x))
         # Put channel axis in the last dim for softmax.
         y_perm = y_conv.permute(0, 2, 3, 4, 1).contiguous()
         y_flat = y_perm.view(-1, 2)
-        y_softmax = self.softmax(y_flat)
-        y_reshape = y_softmax.view(*y_perm.size())
-        return y_reshape.permute(0, 4, 1, 2, 3)
+        return self.softmax(y_flat)
 
 class VNet(nn.Module):
 
-    def __init__(self):
+    def __init__(self, criterion):
         super(VNet, self).__init__()
         self.conv_1 = conv3d_x3(1, 16)
         self.pool_1 = conv3d_as_pool(16, 32)
@@ -112,7 +114,7 @@ class VNet(nn.Module):
         self.deconv_2 = deconv3d_x3(128, 64)
         self.deconv_1 = deconv3d_x3(64, 32)
 
-        self.out = softmax_out(32, 2)
+        self.out = softmax_out(32, 2, criterion)
 
     def forward(self, x):
         conv_1 = self.conv_1(x)
