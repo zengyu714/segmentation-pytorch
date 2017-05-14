@@ -1,9 +1,8 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class conv3d(nn.Module):
 
+class conv3d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, activation_func=nn.ReLU):
         """
         + Instantiate modules: conv-relu-norm
@@ -13,10 +12,11 @@ class conv3d(nn.Module):
         self.conv = nn.Conv3d(in_channels, out_channels, kernel_size, padding=1)
         self.relu = activation_func()
         # with learnable parameters
-        self.norm = nn.InstanceNorm3d(out_channels, affine=True)
+        # self.norm = nn.InstanceNorm3d(out_channels, affine=True)
 
     def forward(self, x):
-        return self.relu(self.norm(self.conv(x)))
+        return self.relu(self.conv(x))
+
 
 class conv3d_x3(nn.Module):
     """Three serial convs with a residual connection.
@@ -25,9 +25,10 @@ class conv3d_x3(nn.Module):
         inputs --> ① --> ② --> ③ --> outputs
                    ↓ --> add--> ↑
     """
+
     def __init__(self, in_channels, out_channels, kernel_size=3):
         super(conv3d_x3, self).__init__()
-        self.conv_1 = conv3d(in_channels,  out_channels, kernel_size)
+        self.conv_1 = conv3d(in_channels, out_channels, kernel_size)
         self.conv_2 = conv3d(out_channels, out_channels, kernel_size)
         self.conv_3 = conv3d(out_channels, out_channels, kernel_size)
 
@@ -36,8 +37,8 @@ class conv3d_x3(nn.Module):
         z_3 = self.conv_3(self.conv_2(z_1))
         return z_1 + z_3
 
-class deconv3d_x3(nn.Module):
 
+class deconv3d_x3(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=2, activation_func=nn.ReLU):
         super(deconv3d_x3, self).__init__()
         self.up = deconv3d_as_up(in_channels, out_channels, kernel_size, stride)
@@ -50,6 +51,7 @@ class deconv3d_x3(nn.Module):
         rhs_add = crop(rhs_up, lhs_conv) + lhs_conv
         return self.conv_x3(rhs_add)
 
+
 def crop(large, small):
     """large / small with shape [batch_size, channels, depth, height, width]"""
 
@@ -57,27 +59,24 @@ def crop(large, small):
     offset = [0, 0, (l[2] - s[2]) // 2, (l[3] - s[3]) // 2, (l[4] - s[4]) // 2]
     return large[..., offset[2]: offset[2] + s[2], offset[3]: offset[3] + s[3], offset[4]: offset[4] + s[4]]
 
+
 def conv3d_as_pool(in_channels, out_channels, kernel_size=3, stride=2, activation_func=nn.ReLU):
-    layers = [
+    return nn.Sequential(
         nn.Conv3d(in_channels, out_channels, kernel_size, stride, padding=1),
-        nn.InstanceNorm3d(out_channels, affine=True),
-        activation_func()
-    ]
-    return nn.Sequential(*layers)
+        activation_func())
+
 
 def deconv3d_as_up(in_channels, out_channels, kernel_size=3, stride=2, activation_func=nn.ReLU):
-    layers = [
+    return nn.Sequential(
         nn.ConvTranspose3d(in_channels, out_channels, kernel_size, stride),
-        nn.InstanceNorm3d(out_channels, affine=True),
         activation_func()
-    ]
-    return nn.Sequential(*layers)
+    )
+
 
 class softmax_out(nn.Module):
-
-    def __init__(self, in_channels,  out_channels, criterion):
+    def __init__(self, in_channels, out_channels, criterion):
         super(softmax_out, self).__init__()
-        self.conv_1 = nn.Conv3d(in_channels,  out_channels, kernel_size=3, padding=1)
+        self.conv_1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1)
         self.conv_2 = nn.Conv3d(out_channels, out_channels, kernel_size=1, padding=0)
         if criterion == 'nll':
             self.softmax = F.log_softmax
@@ -94,8 +93,8 @@ class softmax_out(nn.Module):
         y_flat = y_perm.view(-1, 2)
         return self.softmax(y_flat)
 
-class VNet(nn.Module):
 
+class VNet(nn.Module):
     def __init__(self, criterion):
         super(VNet, self).__init__()
         self.conv_1 = conv3d_x3(1, 16)

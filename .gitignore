@@ -3,9 +3,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-
 # Jupyter Notebook
 *.ipynb_checkpoints
 
 # Source data
-/data/
+data/
+
+# PyCharm
+.idea/
+
+.idea/deployment.xml

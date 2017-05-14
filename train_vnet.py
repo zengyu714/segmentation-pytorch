@@ -1,9 +1,8 @@
-import time
-import torch
+import os
+
 import torch.optim as optim
 import torch.nn.functional as F
 
-from torch import nn
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
@@ -17,11 +16,10 @@ conf = config()
 conf.prefix = 'vnet'
 conf.checkpoint_dir += conf.prefix
 conf.result_dir += conf.prefix
-conf.learning_rate = 3e-7
+conf.learning_rate = 3e-6
 conf.from_scratch = False
 conf.resume_step = -1
-# 'dice' or 'nll'
-conf.criterion = 'nll'
+conf.criterion = 'nll'  # 'dice' or 'nll'
 
 # GPU configuration
 if conf.cuda:
@@ -32,11 +30,15 @@ torch.manual_seed(conf.seed)
 if conf.cuda:
     torch.cuda.manual_seed(conf.seed)
 
+
 def training_data_loader():
     return DataLoader(dataset=DatasetFromFolder(), num_workers=conf.threads, batch_size=conf.batch_size, shuffle=True)
 
+
 def validation_data_loader():
-    return DataLoader(dataset=DatasetFromFolder('./data/val'), num_workers=conf.threads, batch_size=conf.batch_size, shuffle=False)
+    return DataLoader(dataset=DatasetFromFolder('./data/val'), num_workers=conf.threads, batch_size=conf.batch_size,
+                      shuffle=True)
+
 
 def get_resume_path():
     """Return latest checkpoints by default otherwise return the specified one."""
@@ -49,6 +51,7 @@ def get_resume_path():
         return require
     raise Exception('\'%s\' dose not exist!' % require)
 
+
 def save_checkpoints(model, step):
     # Save 20 checkpoints at most.
     names = os.listdir(conf.checkpoint_dir)
@@ -59,6 +62,7 @@ def save_checkpoints(model, step):
     torch.save(model.state_dict(), os.path.join(conf.checkpoint_dir, filename))
     print("===> ===> ===> Save checkpoint {} to {}".format(step, filename))
 
+
 def main():
     print('===> Building vnet...')
     model = VNet(conf.criterion)
@@ -68,12 +72,17 @@ def main():
     if conf.criterion == 'nll':
         # To balance between foreground and backgound for NLL.
         pos_ratio = np.mean([label.float().mean() for image, label in validation_data_loader()])
-        bg_weight =  pos_ratio / (1. + pos_ratio)
+        bg_weight = pos_ratio / (1. + pos_ratio)
         fg_weight = 1. - bg_weight
         class_weight = torch.FloatTensor([bg_weight, fg_weight])
         if conf.cuda:
             class_weight = class_weight.cuda()
         print('---> Background weight:', bg_weight)
+
+        criterion = partial(F.nll_loss, weight=class_weight)
+    # Must be 'dice' here.
+    else:
+        criterion = dice_loss
 
     print('===> Loss function: {}'.format(conf.criterion))
     print('===> Number of params: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
@@ -92,11 +101,6 @@ def main():
     # Define optimizer, loss is related to conf.criterion.
     optimizer = optim.Adam(model.parameters(), lr=conf.learning_rate)
     total_i = conf.epochs * conf.augment_size
-
-    if conf.criterion == 'nll':
-        criterion = partial(F.nll_loss, weight=class_weight)
-    else:
-        criterion = dice_loss
 
     def train():
         epoch_loss = 0
@@ -136,9 +140,10 @@ def main():
             accuracy = pred.eq(true).cpu().sum() / true.numel() * 100
             epoch_acc += accuracy
 
-        avg_loss, avg_dice, avg_acc =np.array([epoch_loss, epoch_overlap, epoch_acc]) / conf.training_size
+        avg_loss, avg_dice, avg_acc = np.array([epoch_loss, epoch_overlap, epoch_acc]) / conf.training_size
         print_format = [i, i // conf.augment_size + 1, conf.epochs, avg_loss, avg_dice, avg_acc]
-        print('===> Training step {} ({}/{})\tLoss: {:.5f}\tDice Overlap {:.5f}\tAccuracy: {:.5f}'.format(*print_format))
+        print(
+            '===> Training step {} ({}/{})\tLoss: {:.5f}\tDice Overlap {:.5f}\tAccuracy: {:.5f}'.format(*print_format))
         return avg_loss, avg_dice, avg_acc
 
     def validate():
@@ -147,7 +152,7 @@ def main():
         epoch_acc = 0
 
         # Sets the module in evaluation mode
-        # This has any effect only on modules such as Dropout or BatchNorm.
+        # The model structure is the same as `model.train` because there're no norm/drop layers
         model.eval()
 
         for image, label in validation_data_loader():
@@ -176,9 +181,9 @@ def main():
         avg_loss, avg_dice, avg_acc = np.array([epoch_loss, epoch_overlap, epoch_acc]) / conf.val_size
         print(
             '===> ===> Validation Performance', '-' * 60,
-            'Loss: %7.5f' % avg_loss, '-' * 2,
-            'Dice Overlap %7.5f' % avg_dice, '-' * 2,
-            'Accuracy: %7.5f' % avg_acc
+                                                'Loss: %7.5f' % avg_loss, '-' * 2,
+                                                'Dice Overlap %7.5f' % avg_dice, '-' * 2,
+                                                'Accuracy: %7.5f' % avg_acc
         )
         return avg_loss, avg_dice, avg_acc
 
@@ -201,6 +206,7 @@ def main():
             save_checkpoints(model, i)
             # np.load('path/to/').item()
             np.save(os.path.join(conf.result_dir, 'results_dict.npy'), results_dict)
+
 
 if __name__ == '__main__':
     main()

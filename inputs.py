@@ -1,21 +1,22 @@
-import os, time
+import os
+import time
 
-import torch
-import numpy as np
 import nibabel as nib
+import numpy as np
+import torch
 import torch.utils.data as data
-
-from scipy.ndimage import generate_binary_structure, binary_dilation, binary_erosion
-from skimage.filters import sobel_h
 from skimage.exposure import adjust_gamma, adjust_sigmoid
+from skimage.filters import sobel_h
 from skimage.transform import rotate, rescale
+
 
 def _get_boundary(im):
     """Find the upper and lower boundary between body and background."""
     edge_sobel = sobel_h(im)
     threshold = np.max(edge_sobel) / 20
-    top, bottom = np.where(edge_sobel > threshold)[0][[0, -1]] # index arrays
+    top, bottom = np.where(edge_sobel > threshold)[0][[0, -1]]  # index arrays
     return top, bottom
+
 
 def _banish_darkness(xs, ys):
     """Clip black background region from nii raw data along y-axis, to alleviate computations.
@@ -38,6 +39,7 @@ def _banish_darkness(xs, ys):
         t = b - 180
     return xs[:, t: b, :], ys[:, t: b, :], t, b
 
+
 def _augment(xs):
     """Image adjustment doesn't change image shape, but for intensity.
     Return:
@@ -50,6 +52,7 @@ def _augment(xs):
     contrast_gain = np.random.uniform(low=5, high=10)
     aj_contrast = adjust_sigmoid(aj_bright, gain=contrast_gain)
     return aj_contrast
+
 
 def _rotate_and_rescale(xs, ys):
     """Rotate images and labels and scale image and labels by a certain factor.
@@ -68,19 +71,20 @@ def _rotate_and_rescale(xs, ys):
     xs, ys = [np.transpose(item, [2, 0, 1]) for item in [HWC_xs, HWC_ys]]
     return xs, ys
 
+
 def _translate(xs, ys):
     """Perform translate, and the displacement is skewed to 0.
         In detail, take samples from the modified power function distribution.
     """
 
-    samples = np.random.power(5, size=4)               # samples now in range [0, 1]
-    skewed_samples = np.int8((- samples + 2) * 15)     # skewed_samples in range [1, 16]
-    r1, c1, r2, c2 = skewed_samples                    # discard 0 for indexing `-0`
+    samples = np.random.power(5, size=4)  # samples now in range [0, 1]
+    skewed_samples = np.int8((- samples + 2) * 15)  # skewed_samples in range [1, 16]
+    r1, c1, r2, c2 = skewed_samples  # discard 0 for indexing `-0`
     trans_xs, trans_ys = [item[:, r1: -r2, c1: -c2] for item in [xs, ys]]
     return trans_xs, trans_ys
 
-class DatasetFromFolder(data.Dataset):
 
+class DatasetFromFolder(data.Dataset):
     def __init__(self, data_path='./data/train'):
         """Assume dataset is in directory '.data/train' or './data/val'
             1. Read one data from file (e.g. using numpy.fromfile, PIL.Image.open).
@@ -88,7 +92,7 @@ class DatasetFromFolder(data.Dataset):
             3. Return a data pair (e.g. image and label).
         """
         super(DatasetFromFolder, self).__init__()
-        self.data_path  = data_path
+        self.data_path = data_path
         self.label_path = [os.path.join(self.data_path, p)
                            for p in os.listdir(self.data_path) if p.endswith('Label.nii')]
         self.image_path = [p.replace('_Label', '') for p in self.label_path]
