@@ -20,7 +20,7 @@ conf.result_dir += conf.prefix
 conf.learning_rate = 1e-6
 conf.from_scratch = False
 conf.resume_step = -1
-conf.criterion = 'nll'  # 'dice' or 'nll'
+conf.criterion = 'dice'  # 'dice' or 'nll'
 
 # Instantiate plot
 vis = visdom.Visdom()
@@ -166,7 +166,7 @@ def main():
         avg_loss, avg_dice, avg_acc = np.array([epoch_loss, epoch_overlap, epoch_acc]) / conf.training_size
         print_format = [i, i // conf.augment_size + 1, conf.epochs, avg_loss, avg_dice, avg_acc]
         print(
-            '===> Training step {} ({}/{})\tLoss: {:.5f}\tDice Overlap {:.5f}\tAccuracy: {:.5f}'.format(*print_format))
+            '===> Training step {} ({}/{})\tLoss: {:.5f}\tDice Overlap: {:.5f}\tAccuracy: {:.5f}'.format(*print_format))
 
         image, true, pred = reimage(image, true, pred)
         return avg_loss, avg_dice, avg_acc, image, true, pred
@@ -209,7 +209,7 @@ def main():
         print(
             '===> ===> Validation Performance', '-' * 60,
                                                 'Loss: %7.5f' % avg_loss, '-' * 2,
-                                                'Dice Overlap %7.5f' % avg_dice, '-' * 2,
+                                                'Dice Overlap: %7.5f' % avg_dice, '-' * 2,
                                                 'Accuracy: %7.5f' % avg_acc
         )
 
@@ -239,24 +239,24 @@ def main():
             # Windows for images
             wins_train_im = [vis.images(item, opts=dict(title='train_' + im_titles[j])) for j, item in
                              enumerate([train_im, train_true, train_pred])]
-            wins_val_im = [vis.images(item, opts=dict(title='train_' + im_titles[j])) for j, item in
+            wins_val_im = [vis.images(item, opts=dict(title='val_' + im_titles[j])) for j, item in
                            enumerate([val_im, val_true, val_pred])]
 
             # Resume values from records
             if i > 1:
                 record_results = [np.column_stack((results_dict['train_' + stat][:i], results_dict['val_' + stat][:i]))
-                                 for stat in stats]
+                                  for stat in stats]
                 for j, stat in enumerate(stats):
                     wins.append(vis.line(X=np.arange(i), Y=record_results[j], opts=basic_opts(title=stat)))
             # Plots from scratch
             elif i == 1:
                 for j, stat in enumerate(stats):
-                    wins.append(vis.line(X=np.array([i]), Y=epoch_results[j], opts=basic_opts(title=stat)))
+                    wins.append(vis.line(X=np.array([i]), Y=epoch_results[None, j], opts=basic_opts(title=stat)))
         # Update windows
         else:
             for j, win in enumerate(wins):
                 vis.updateTrace(X=np.array([i]), Y=epoch_results[j][0, None], win=win, name='train')
-                vis.updateTrace(X=np.array([i]), Y=epoch_results[j][1, None], win=win, name= 'val')
+                vis.updateTrace(X=np.array([i]), Y=epoch_results[j][1, None], win=win, name='val')
             if i % 10 == 0:
                 # Update image show per 10 epochs
                 for j, item in enumerate([train_im, train_true, train_pred]):

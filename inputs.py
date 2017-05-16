@@ -47,11 +47,8 @@ def _augment(xs):
     """
 
     # `xs` has shape [depth, height, width] with value in [0, 1].
-    brt_gamma, brt_gain = np.random.uniform(low=0.9, high=1.1, size=2)
-    aj_bright = adjust_gamma(xs, brt_gamma, brt_gain)
-    contrast_gain = np.random.uniform(low=5, high=10)
-    aj_contrast = adjust_sigmoid(aj_bright, gain=contrast_gain)
-    return aj_contrast
+    gamma = np.random.uniform(low=0.9, high=1.1)
+    return adjust_gamma(xs, gamma)
 
 
 def _rotate_and_rescale(xs, ys):
@@ -116,7 +113,7 @@ class DatasetFromFolder(data.Dataset):
         xs = _augment(xs)
 
         # Regenerate the binary label, just in case.
-        ys = (ys > 0).astype(np.uint8)
+        ys = (ys > 0.5).astype(np.uint8)
 
         # Add gray image channel, with shape [1, depth, height, width]
         xs, ys = [item[np.newaxis, ...] for item in [xs, ys]]
